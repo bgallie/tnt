@@ -1,1 +1,5 @@
-tnt*
+tnt
+*.tnt
+*.swp
+*.[0-9]
+launch.json

@@ -129,7 +129,7 @@ func encrypt(args []string) {
 	}
 	headerLine += fmt.Sprintf("|%s\n", tntMachine.Index())
 	fout.WriteString(headerLine)
-	encIn = toBinaryHelper(fin)
+	encIn = toBinaryHelper(bufio.NewReaderSize(fin, 2048))
 
 	defer fout.Close()
 	bRdr := bufio.NewReader(encIn)
@@ -145,7 +145,6 @@ func encrypt(args []string) {
 	<-tntMachine.Right()
 	// allow the tntMachine to be garbage collected.
 	tntMachine = *new(tntengine.TntEngine)
-
 }
 
 // toBinaryHelper provides the means to output pure binary encrypted
@@ -154,52 +153,44 @@ func toBinaryHelper(rdr io.Reader) *io.PipeReader {
 	rRdr, rWrtr := io.Pipe()
 	var cnt int
 	var err error
+	plainText := make([]byte, 0)
 	leftMost, rightMost := tntMachine.Left(), tntMachine.Right()
-	checkError(err)
 	wg.Add(1)
 
 	go func() {
 		defer wg.Done()
 		defer rWrtr.Close()
-		plainText := make([]byte, 0)
-		blk := make(tntengine.CipherBlock, tntengine.CipherBlockBytes)
 		err = nil
+		blk := make(tntengine.CipherBlock, tntengine.CipherBlockBytes)
 
 		for err != io.EOF {
 			b := make([]byte, 2048)
 			cnt, err = rdr.Read(b)
 			checkError(err)
-
 			if err != io.EOF {
 				plainText = append(plainText, b[:cnt]...)
-				for len(plainText) > 0 {
-					cnt := copy(blk, plainText)
-					leftMost <- blk[:cnt]
+				for len(plainText) >= tntengine.CipherBlockBytes {
+					cnt = copy(blk, plainText)
+					leftMost <- blk
 					blk = <-rightMost
-					bw, err1 := rWrtr.Write(blk[:cnt])
+					bw, err1 := rWrtr.Write(blk)
 					checkError(err1)
 					bytesWritten += int64(bw)
-					// pt := make([]byte, 0)
-					// pt = append(pt, plainText[len(blk):]...)
-					plainText = plainText[:cnt]
+					plainText = plainText[cnt:]
 				}
 			}
 		}
 
-		// if len(plainText) > 0 {
-		// 	cnt = copy(blk[:], plainText[:])
-		// 	leftMost <- blk
-		// 	blk = <-rightMost
-		// 	_, err1 := rWrtr.Write(blk[:])
-		// 	checkError(err1)
-		// 	bytesWritten += int64(len(blk))
-		// }
+		if len(plainText) > 0 {
+			cnt = copy(blk, plainText)
+			leftMost <- blk[:cnt]
+			blk = <-rightMost
+			cnt, err = rWrtr.Write(blk)
+			checkError(err)
+			bytesWritten += int64(cnt)
+		}
 
 		fmt.Fprintf(os.Stderr, "Bytes written: %d\n", bytesWritten)
-		// // shutdown the decryption machine by processing a CypherBlock with zero
-		// // value length field.
-		// leftMost <- blk[:0]
-		// <-rightMost
 	}()
 
 	return rRdr

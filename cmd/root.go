@@ -168,8 +168,6 @@ func initEngine(args []string) {
 
 	if len(secret) == 0 {
 		cobra.CheckErr("You must supply a password.")
-		// } else {
-		// 	fmt.Printf("Secret: [%s]\n", secret)
 	}
 
 	// Initialize the tntengine with the secret key and the named proforma file.
