@@ -2,10 +2,8 @@ module github.com/bgallie/tnt
 
 go 1.20
 
-replace github.com/bgallie/tntengine => ../tntengine
-
 require (
-	github.com/bgallie/tntengine v1.5.2
+	github.com/bgallie/tntengine v1.5.3
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.16.0
 	golang.org/x/term v0.9.0
