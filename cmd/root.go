@@ -60,7 +60,7 @@ const (
 var rootCmd = &cobra.Command{
 	Use:     "tnt",
 	Short:   "An Infinite Key Encryption System",
-	Long:    `tnt is a program the encrypts/decrypts files using an infinite (with respect to the plaintext) key.`,
+	Long:    `tnt is a program that encrypts/decrypts files using an infinite (with respect to the plaintext) key.`,
 	Version: Version,
 }
 
@@ -73,9 +73,8 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.tnt.yaml)")
-	rootCmd.PersistentFlags().StringVarP(&inputFileName, "inputFile", "i", "-", "Name of the plaintext file to encrypt/decrypt.")
-	rootCmd.PersistentFlags().StringVarP(&outputFileName, "outputFile", "o", "", "Name of the file containing the encrypted/decrypted plaintext.")
-
+	rootCmd.PersistentFlags().StringVarP(&inputFileName, "inputFile", "i", "-", "Name of the file to encrypt/decrypt.")
+	rootCmd.PersistentFlags().StringVarP(&outputFileName, "outputFile", "o", "", "Name of the file containing the encrypted/decrypted data.")
 	// Extract version information from the stored build information.
 	bi, ok := dbug.ReadBuildInfo()
 	if ok {
@@ -91,7 +90,6 @@ func init() {
 			GitState = "dirty"
 		}
 	}
-
 	// Get the build date (as the modified date of the executable) if the build date
 	// is not set.
 	if BuildDate == "not set" {
@@ -124,20 +122,16 @@ func initConfig() {
 		// Find home directory.
 		home, err := os.UserHomeDir()
 		cobra.CheckErr(err)
-
 		// Search config in home directory with name ".tnt" (without extension).
 		viper.AddConfigPath(home)
 		viper.SetConfigType("yaml")
 		viper.SetConfigName(".tnt")
 	}
-
 	viper.AutomaticEnv() // read in environment variables that match
-
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
-
 	// Get the counter file name based on the current user.
 	u, err := user.Current()
 	cobra.CheckErr(err)
@@ -165,11 +159,9 @@ func initEngine(args []string) {
 	} else {
 		secret = strings.Join(args, " ")
 	}
-
 	if len(secret) == 0 {
 		cobra.CheckErr("You must supply a password.")
 	}
-
 	// Initialize the tntengine with the secret key and the named proforma file.
 	tntMachine.Init([]byte(secret))
 }
@@ -181,8 +173,8 @@ then those files will be opened.  Otherwise stdin and stdout are used.
 */
 func getInputAndOutputFiles(encode bool) (*os.File, *os.File) {
 	var fin *os.File
+	var fout *os.File
 	var err error
-
 	if len(inputFileName) > 0 {
 		if inputFileName == "-" {
 			fin = os.Stdin
@@ -193,9 +185,6 @@ func getInputAndOutputFiles(encode bool) (*os.File, *os.File) {
 	} else {
 		fin = os.Stdin
 	}
-
-	var fout *os.File
-
 	if len(outputFileName) > 0 {
 		if outputFileName == "-" {
 			fout = os.Stdout
@@ -218,8 +207,51 @@ func getInputAndOutputFiles(encode bool) (*os.File, *os.File) {
 			fout = os.Stdout
 		}
 	}
-	// fmt.Fprintf(os.Stderr, "Input: [%s] Output:[%s]\n", inputFileName, outputFileName)
 	return fin, fout
+}
+
+// processHelper is a filter that encrypts/decrypts the data from the input pipe.
+// The data can be read using the returned PipeReader.
+func processHelper(rdr io.Reader, left, right chan tntengine.CipherBlock) *io.PipeReader {
+	var cnt int
+	var err error
+	rRdr, rWrtr := io.Pipe()
+	leftMost, rightMost := left, right
+	data := []byte(nil)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer rWrtr.Close()
+		err = nil
+		blk := make(tntengine.CipherBlock, tntengine.CipherBlockBytes)
+		for err != io.EOF {
+			b := make([]byte, 2048)
+			cnt, err = rdr.Read(b)
+			checkError(err)
+			if err != io.EOF {
+				data = append(data, b[:cnt]...)
+				for len(data) >= tntengine.CipherBlockBytes {
+					cnt = copy(blk, data)
+					leftMost <- blk
+					blk = <-rightMost
+					bw, err1 := rWrtr.Write(blk)
+					checkError(err1)
+					bytesWritten += int64(bw)
+					data = data[cnt:]
+				}
+			}
+		}
+		if len(data) > 0 {
+			cnt := copy(blk, data)
+			leftMost <- blk[:cnt]
+			blk = <-rightMost
+			cnt, err = rWrtr.Write(blk)
+			checkError(err)
+			bytesWritten += int64(cnt)
+		}
+		fmt.Fprintf(os.Stderr, "Bytes written: %d\n", bytesWritten)
+	}()
+	return rRdr
 }
 
 // checkFatal checks for error that are not io.EOF and io.ErrUnexpectedEOF and logs them.
@@ -234,7 +266,6 @@ func readCounterFile(defaultMap map[string]*big.Int) map[string]*big.Int {
 	if err != nil {
 		return defaultMap
 	}
-
 	defer f.Close()
 	cmap := make(map[string]*big.Int)
 	dec := gob.NewDecoder(f)
@@ -247,7 +278,6 @@ func writeCounterFile(wMap map[string]*big.Int) error {
 	if err != nil {
 		return err
 	}
-
 	defer f.Close()
 	enc := gob.NewEncoder(f)
 	return enc.Encode(wMap)

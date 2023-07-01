@@ -53,63 +53,14 @@ func init() {
 	rootCmd.AddCommand(decodeCmd)
 }
 
-// fromBinaryHelper provides the neams to decrypt the pure binary input
-// into the output pipe stream.  The data can be read using the returned
-// PipeReader.
-func fromBinaryHelper(rdr io.Reader) *io.PipeReader {
-	rRdr, rWrtr := io.Pipe()
-	leftMost, rightMost := tntMachine.Left(), tntMachine.Right()
-	wg.Add(1)
-
-	go func() {
-		defer wg.Done()
-		defer rWrtr.Close()
-		var err error = nil
-		encText := []byte(nil)
-		blk := make(tntengine.CipherBlock, tntengine.CipherBlockBytes)
-
-		for err != io.EOF {
-			b := make([]byte, 2048)
-			rCnt, err := rdr.Read(b)
-			checkError(err)
-			if err != io.EOF {
-				encText = append(encText, b[:rCnt]...)
-				for len(encText) >= tntengine.CipherBlockBytes {
-					cnt := copy(blk, encText)
-					leftMost <- blk
-					blk = <-rightMost
-					bw, err1 := rWrtr.Write(blk)
-					checkError(err1)
-					bytesWritten += int64(bw)
-					encText = encText[cnt:]
-				}
-			} else {
-				break
-			}
-		}
-		if len(encText) > 0 {
-			cnt := copy(blk, encText)
-			leftMost <- blk[:cnt]
-			blk = <-rightMost
-			bw, err1 := rWrtr.Write(blk)
-			checkError(err1)
-			bytesWritten += int64(bw)
-		}
-
-		fmt.Fprintf(os.Stderr, "Bytes written: %d\n", bytesWritten)
-	}()
-
-	return rRdr
-}
-
 func decrypt(args []string) {
 	initEngine(args)
-
 	// Set the engine type and build the cipher machine.
 	tntMachine.SetEngineType("D")
 	tntMachine.BuildCipherMachine()
+	// get input and output files
 	fin, fout := getInputAndOutputFiles(false)
-	defer fout.Close()
+	// Process the header line from the encrypted file.
 	var ofName string
 	var bRdr *bufio.Reader
 	var err error
@@ -133,7 +84,6 @@ func decrypt(args []string) {
 			iCnt, _ = new(big.Int).SetString(fields[2], 10)
 		}
 	}
-
 	// If an output file was not given in the command line arguments, but one
 	// was given in the header line of the input file, use that filename.
 	if len(outputFileName) == 0 {
@@ -143,38 +93,11 @@ func decrypt(args []string) {
 			checkError(err)
 		}
 	}
-
+	// Set the starting index from the header file.
 	tntMachine.SetIndex(iCnt)
-	// leftMost, rightMost := tntMachine.Left(), tntMachine.Right()
-	// decRdr, decWrtr := io.Pipe()
-	// err = nil
-	// wg.Add(1)
-	decRdr := fromBinaryHelper(bRdr)
-	// go func() {
-	// 	defer wg.Done()
-	// 	defer decWrtr.Close()
-	// 	var rCnt int
-	// 	// encText := make([]byte, 0)
-	// 	aRdr := fromBinaryHelper(bRdr)
-	// 	blk := make(tntengine.CipherBlock, tntengine.CipherBlockBytes)
-	// 	for err != io.EOF {
-	// 		b := make([]byte, 2048)
-	// 		rCnt, err = aRdr.Read(b)
-	// 		checkError(err)
-	// 		if err != io.EOF {
-	// 			encText = append(encText, b[:rCnt]...)
-	// 			for len(encText) > 0 {
-	// 				cnt := copy(blk, encText[:])
-	// 				leftMost <- blk[:cnt]
-	// 				blk = <-rightMost
-	// 				_, err1 := decWrtr.Write(blk[:cnt])
-	// 				checkError(err1)
-	// 				encText = encText[cnt:]
-	// 			}
-	// 		}
-	// 	}
-	// }()
-
+	// Set up the filter to decrypt the input file and send it to the output file.
+	defer fout.Close()
+	decRdr := processHelper(bRdr, tntMachine.Left(), tntMachine.Right())
 	_, err = io.Copy(fout, decRdr)
 	checkError(err)
 	wg.Wait() // Wait for the decryption machine to finish it's clean up.

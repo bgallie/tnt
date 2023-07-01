@@ -69,7 +69,6 @@ The inital block count is only effective on the first use of the secret key.`)
 
 func encrypt(args []string) {
 	initEngine(args)
-
 	// Get the starting block count.  cnt can be a number or a fraction such
 	// as "1/2", "2/3", or "3/4".  If it is a fraction, then the starting block
 	// count is calculated by multiplying the maximal states of the tntEngine
@@ -99,11 +98,9 @@ func encrypt(args []string) {
 	} else {
 		iCnt = new(big.Int).Set(tntengine.BigZero)
 	}
-
 	// Set the engine type and build the cipher machine.
 	tntMachine.SetEngineType("E")
 	tntMachine.BuildCipherMachine()
-
 	// Read in the map of counts from the file which holds the counts and get
 	// the count to use to encrypt the file.
 	cMap = make(map[string]*big.Int)
@@ -119,23 +116,23 @@ func encrypt(args []string) {
 	}
 	// Now we can set the index of the ciper machine.
 	tntMachine.SetIndex(iCnt)
-
-	var encIn *io.PipeReader
-	// leftMost, rightMost := tntMachine.Left(), tntMachine.Right()
+	// Get the input and output files
 	fin, fout := getInputAndOutputFiles(true)
+	// Create and output the header line.
 	headerLine = "+TNT|"
 	if len(inputFileName) > 0 && inputFileName != "-" {
 		headerLine += inputFileName
 	}
 	headerLine += fmt.Sprintf("|%s\n", tntMachine.Index())
 	fout.WriteString(headerLine)
-	encIn = toBinaryHelper(bufio.NewReaderSize(fin, 2048))
-
+	// Set up the fileter to encode the input file and send it to the output file.
+	encIn := processHelper(bufio.NewReaderSize(fin, 2048), tntMachine.Left(), tntMachine.Right())
 	defer fout.Close()
-	bRdr := bufio.NewReader(encIn)
-	_, err := io.Copy(fout, bRdr)
+	_, err := io.Copy(fout, encIn)
 	checkError(err)
+	// Wait for the encryption to finish
 	wg.Wait()
+	// Update the counter map with the new block counts.
 	cMap[mKey] = tntMachine.Index()
 	checkError(writeCounterFile(cMap))
 	// shutdown the encryption machine by processing a CypherBlock with zero
@@ -145,53 +142,4 @@ func encrypt(args []string) {
 	<-tntMachine.Right()
 	// allow the tntMachine to be garbage collected.
 	tntMachine = *new(tntengine.TntEngine)
-}
-
-// toBinaryHelper provides the means to output pure binary encrypted
-// data to the output file..
-func toBinaryHelper(rdr io.Reader) *io.PipeReader {
-	rRdr, rWrtr := io.Pipe()
-	var cnt int
-	var err error
-	plainText := make([]byte, 0)
-	leftMost, rightMost := tntMachine.Left(), tntMachine.Right()
-	wg.Add(1)
-
-	go func() {
-		defer wg.Done()
-		defer rWrtr.Close()
-		err = nil
-		blk := make(tntengine.CipherBlock, tntengine.CipherBlockBytes)
-
-		for err != io.EOF {
-			b := make([]byte, 2048)
-			cnt, err = rdr.Read(b)
-			checkError(err)
-			if err != io.EOF {
-				plainText = append(plainText, b[:cnt]...)
-				for len(plainText) >= tntengine.CipherBlockBytes {
-					cnt = copy(blk, plainText)
-					leftMost <- blk
-					blk = <-rightMost
-					bw, err1 := rWrtr.Write(blk)
-					checkError(err1)
-					bytesWritten += int64(bw)
-					plainText = plainText[cnt:]
-				}
-			}
-		}
-
-		if len(plainText) > 0 {
-			cnt = copy(blk, plainText)
-			leftMost <- blk[:cnt]
-			blk = <-rightMost
-			cnt, err = rWrtr.Write(blk)
-			checkError(err)
-			bytesWritten += int64(cnt)
-		}
-
-		fmt.Fprintf(os.Stderr, "Bytes written: %d\n", bytesWritten)
-	}()
-
-	return rRdr
 }
