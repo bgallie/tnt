@@ -200,7 +200,7 @@ func getInputAndOutputFiles(encode bool) (*os.File, *os.File) {
 		cobra.CheckErr(err)
 	} else {
 		if strings.HasSuffix(inputFileName, ".tnt") {
-			outputFileName = inputFileName[:len(inputFileName)-5]
+			outputFileName = inputFileName[:len(inputFileName)-4]
 			fout, err = os.Create(outputFileName)
 			cobra.CheckErr(err)
 		} else {
@@ -210,9 +210,9 @@ func getInputAndOutputFiles(encode bool) (*os.File, *os.File) {
 	return fin, fout
 }
 
-// processHelper is a filter that encrypts/decrypts the data from the input pipe.
+// cipherHelper is a filter that encrypts/decrypts the data from the input pipe.
 // The data can be read using the returned PipeReader.
-func processHelper(rdr io.Reader, left, right chan tntengine.CipherBlock) *io.PipeReader {
+func cipherHelper(rdr io.Reader, left, right chan tntengine.CipherBlock) *io.PipeReader {
 	var cnt int
 	var err error
 	rRdr, rWrtr := io.Pipe()
@@ -234,9 +234,8 @@ func processHelper(rdr io.Reader, left, right chan tntengine.CipherBlock) *io.Pi
 					cnt = copy(blk, data)
 					leftMost <- blk
 					blk = <-rightMost
-					bw, err1 := rWrtr.Write(blk)
+					_, err1 := rWrtr.Write(blk)
 					checkError(err1)
-					bytesWritten += int64(bw)
 					data = data[cnt:]
 				}
 			}
@@ -245,11 +244,9 @@ func processHelper(rdr io.Reader, left, right chan tntengine.CipherBlock) *io.Pi
 			cnt := copy(blk, data)
 			leftMost <- blk[:cnt]
 			blk = <-rightMost
-			cnt, err = rWrtr.Write(blk)
+			_, err = rWrtr.Write(blk)
 			checkError(err)
-			bytesWritten += int64(cnt)
 		}
-		fmt.Fprintf(os.Stderr, "Bytes written: %d\n", bytesWritten)
 	}()
 	return rRdr
 }

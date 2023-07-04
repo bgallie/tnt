@@ -29,10 +29,9 @@ import (
 )
 
 var (
-	cnt          string
-	wg           sync.WaitGroup
-	bytesWritten int64
-	headerLine   string
+	cnt        string
+	wg         sync.WaitGroup
+	headerLine string
 )
 
 // encryptCmd represents the encrypt command
@@ -126,7 +125,7 @@ func encrypt(args []string) {
 	headerLine += fmt.Sprintf("|%s\n", tntMachine.Index())
 	fout.WriteString(headerLine)
 	// Set up the fileter to encode the input file and send it to the output file.
-	encIn := processHelper(bufio.NewReaderSize(fin, 2048), tntMachine.Left(), tntMachine.Right())
+	encIn := cipherHelper(bufio.NewReaderSize(fin, 2048), tntMachine.Left(), tntMachine.Right())
 	defer fout.Close()
 	_, err := io.Copy(fout, encIn)
 	checkError(err)

@@ -97,7 +97,7 @@ func decrypt(args []string) {
 	tntMachine.SetIndex(iCnt)
 	// Set up the filter to decrypt the input file and send it to the output file.
 	defer fout.Close()
-	decRdr := processHelper(bRdr, tntMachine.Left(), tntMachine.Right())
+	decRdr := cipherHelper(bRdr, tntMachine.Left(), tntMachine.Right())
 	_, err = io.Copy(fout, decRdr)
 	checkError(err)
 	wg.Wait() // Wait for the decryption machine to finish it's clean up.
