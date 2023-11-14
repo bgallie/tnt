@@ -25,7 +25,7 @@ import (
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Display version information",
-	Long:  `Display version and detailed build information for tnt2.`,
+	Long:  `Display version and detailed build information for tnt.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if Version == "" {
 			Version = "(devel)"
