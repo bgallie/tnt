@@ -1,5 +1,6 @@
 tnt
-tnt.exe
+tnt*.exe
+*.out
 *.tnt
 *.swp
 *.[0-9]
