@@ -1,7 +1,5 @@
 github.com/bgallie/jc1 v1.2.2 h1:EQtpW96gqzVH8jzXjiwIYUec0QlSwjp6OMOTO1rruoI=
 github.com/bgallie/jc1 v1.2.2/go.mod h1:DYi1LTKWFhce4XAKhvyDp6y4cFvRmoXWq0uaCSi59Rc=
-github.com/bgallie/tntengine v1.5.3 h1:Vokv2jPwuk5pDz3//mTE5m+uEpConAN+aPpbon/8ORU=
-github.com/bgallie/tntengine v1.5.3/go.mod h1:CtgJW0gtWF26jkb4E+tDiwqECFQOKkkG5o31L5Bb2rE=
 github.com/cpuguy83/go-md2man/v2 v2.0.3/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

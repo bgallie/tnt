@@ -19,7 +19,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"math/big"
 	"os"
 	"strings"
 
@@ -64,6 +63,7 @@ func decrypt(args []string) {
 	var ofName string
 	var bRdr *bufio.Reader
 	var err error
+	iCnt = new(tntengine.Counter)
 	bRdr = bufio.NewReader(fin)
 	line, err := bRdr.ReadString('\n')
 	if err == nil {
@@ -71,17 +71,17 @@ func decrypt(args []string) {
 		switch len(fields) {
 		case 1: // Oldest TNT output format - It just contains ending block count.
 			ofName = ""
-			iCnt, _ = new(big.Int).SetString(fields[0], 10)
+			iCnt, _ = new(tntengine.Counter).SetString(fields[0])
 		case 2: // Older TNT output format - It contains the original filename and ending block count
 			ofName = fields[0]
-			iCnt, _ = new(big.Int).SetString(fields[1], 10)
+			iCnt, _ = new(tntengine.Counter).SetString(fields[1])
 		default:
 			if fields[0] != "+TNT" {
 				fmt.Fprintln(os.Stderr, "ERROR: Input file is not a recognized TNT output format!")
 				os.Exit(100)
 			}
 			ofName = fields[1]
-			iCnt, _ = new(big.Int).SetString(fields[2], 10)
+			iCnt, _ = new(tntengine.Counter).SetString(fields[2])
 		}
 	}
 	// If an output file was not given in the command line arguments, but one

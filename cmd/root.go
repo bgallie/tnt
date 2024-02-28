@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"math/big"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -38,8 +37,8 @@ import (
 var (
 	cfgFile        string
 	tntMachine     tntengine.TntEngine
-	iCnt           *big.Int
-	cMap           map[string]*big.Int
+	iCnt           *tntengine.Counter
+	cMap           map[string]*tntengine.Counter
 	mKey           string
 	cntrFileName   string
 	inputFileName  string
@@ -53,7 +52,7 @@ var (
 )
 
 const (
-	tntCountFile = ".tnt"
+	tntCountFile = ".tntNew"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -258,19 +257,19 @@ func checkError(e error) {
 	}
 }
 
-func readCounterFile(defaultMap map[string]*big.Int) map[string]*big.Int {
+func readCounterFile(defaultMap map[string]*tntengine.Counter) map[string]*tntengine.Counter {
 	f, err := os.OpenFile(cntrFileName, os.O_RDONLY, 0600)
 	if err != nil {
 		return defaultMap
 	}
 	defer f.Close()
-	cmap := make(map[string]*big.Int)
+	cmap := make(map[string]*tntengine.Counter)
 	dec := gob.NewDecoder(f)
 	checkError(dec.Decode(&cmap))
 	return cmap
 }
 
-func writeCounterFile(wMap map[string]*big.Int) error {
+func writeCounterFile(wMap map[string]*tntengine.Counter) error {
 	f, err := os.OpenFile(cntrFileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err

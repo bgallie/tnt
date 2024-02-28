@@ -19,8 +19,8 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"math/big"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -72,37 +72,38 @@ func encrypt(args []string) {
 	// as "1/2", "2/3", or "3/4".  If it is a fraction, then the starting block
 	// count is calculated by multiplying the maximal states of the tntEngine
 	// by the fraction.
+	iCnt = new(tntengine.Counter)
 	if len(cnt) != 0 {
 		var good bool
 		flds := strings.Split(cnt, "/")
 		if len(flds) == 1 {
-			iCnt, good = new(big.Int).SetString(cnt, 10)
+			iCnt, good = new(tntengine.Counter).SetString(cnt)
 			if !good {
-				cobra.CheckErr(fmt.Sprintf("Failed converting the count to a big.Int: [%s]\n", cnt))
+				cobra.CheckErr(fmt.Sprintf("Failed converting the count to a tntengine.Counter: [%s]\n", cnt))
 			}
 		} else if len(flds) == 2 {
-			m := new(big.Int).Set(tntMachine.MaximalStates())
-			a, good := new(big.Int).SetString(flds[0], 10)
-			if !good {
-				cobra.CheckErr(fmt.Sprintf("Failed converting the numerator to a big.Int: [%s]\n", flds[0]))
+			iCnt.SetIndex(tntMachine.MaximalStates())
+			a, err := strconv.ParseUint(flds[0], 10, 64)
+			if err != nil {
+				cobra.CheckErr(fmt.Sprintf("failed converting the numerator to a tntengine.Counter: [%s]\n", flds[0]))
 			}
-			b, good := new(big.Int).SetString(flds[1], 10)
-			if !good {
-				cobra.CheckErr(fmt.Sprintf("Failed converting the denominator to a big.Int: [%s]\n", flds[1]))
+			b, err := strconv.ParseUint(flds[1], 10, 64)
+			if err != nil {
+				cobra.CheckErr(fmt.Sprintf("failed converting the denominator to a tntengine.Counter: [%s]\n", flds[1]))
 			}
-			iCnt = m.Div(m.Mul(m, a), b)
+			iCnt.Mul(a).Div(b)
 		} else {
 			cobra.CheckErr(fmt.Sprintf("Incorrect initial count: [%s]\n", cnt))
 		}
 	} else {
-		iCnt = new(big.Int).Set(tntengine.BigZero)
+		iCnt.SetIndex(tntengine.BigZero)
 	}
 	// Set the engine type and build the cipher machine.
 	tntMachine.SetEngineType("E")
 	tntMachine.BuildCipherMachine()
 	// Read in the map of counts from the file which holds the counts and get
 	// the count to use to encrypt the file.
-	cMap = make(map[string]*big.Int)
+	cMap = make(map[string]*tntengine.Counter)
 	cMap = readCounterFile(cMap)
 	mKey = tntMachine.CounterKey()
 	if cMap[mKey] == nil {
